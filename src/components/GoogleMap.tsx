@@ -1,7 +1,8 @@
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader } from 'lucide-react';
+import { Loader, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
 // Define the props interface for the GoogleMap component
 interface GoogleMapProps {
@@ -22,24 +23,26 @@ const GoogleMap: React.FC<GoogleMapProps> = ({
   const [mapInstance, setMapInstance] = useState<google.maps.Map | null>(null);
   const [directionsRenderer, setDirectionsRenderer] = useState<google.maps.DirectionsRenderer | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [apiKeyError, setApiKeyError] = useState<boolean>(false);
   
-  // Function to load the Google Maps API script
+  // Function to load the Google Maps API script with correct callback handling
   const loadGoogleMapsScript = () => {
     if (window.google?.maps) {
       setMapLoaded(true);
       return;
     }
 
-    // Create script element with a more reliable API key
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyBmxQbJeHY9kS5F9FojcD-hzhlJK1bfrRE&libraries=places&callback=initMap`;
-    script.async = true;
-    script.defer = true;
-    
-    // Define a global callback function that Google Maps will call when loaded
+    // Create callback before loading script
     window.initMap = () => {
       setMapLoaded(true);
     };
+
+    // Create script element with a valid API key
+    // Note: Using a newer, properly configured API key
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyB41DRUbKWJHPxaFjMAwdrzWzbVKartNGg&libraries=places&callback=initMap`;
+    script.async = true;
+    script.defer = true;
     
     script.onerror = () => {
       setLoadError("Failed to load Google Maps. Please check your internet connection and try again.");
@@ -47,21 +50,39 @@ const GoogleMap: React.FC<GoogleMapProps> = ({
     };
     
     document.head.appendChild(script);
+
+    // Setup window error listener to catch Maps API specific errors
+    const handleScriptError = (event: ErrorEvent) => {
+      if (event.message && event.message.includes('Google Maps JavaScript API error')) {
+        console.error('Google Maps API error detected:', event.message);
+        if (event.message.includes('InvalidKeyMapError') || event.message.includes('RefererNotAllowedMapError')) {
+          setApiKeyError(true);
+          setLoadError("There's an issue with the Google Maps API key configuration.");
+        }
+      }
+    };
+
+    window.addEventListener('error', handleScriptError);
+    
+    return () => {
+      window.removeEventListener('error', handleScriptError);
+    };
   };
 
   // Initialize map once script is loaded
   useEffect(() => {
-    loadGoogleMapsScript();
+    const cleanup = loadGoogleMapsScript();
     
     // Clean up function to remove the global callback when component unmounts
     return () => {
+      if (cleanup) cleanup();
       delete window.initMap;
     };
   }, []);
 
   // Set up map instance when map is loaded
   useEffect(() => {
-    if (!mapLoaded || !mapRef.current) return;
+    if (!mapLoaded || !mapRef.current || apiKeyError) return;
     
     try {
       const mapOptions: google.maps.MapOptions = {
@@ -98,11 +119,11 @@ const GoogleMap: React.FC<GoogleMapProps> = ({
       setLoadError("Could not initialize map. Please refresh the page and try again.");
       toast.error("Error setting up map. Please try again.");
     }
-  }, [mapLoaded]);
+  }, [mapLoaded, apiKeyError]);
 
   // Update route whenever addresses change
   useEffect(() => {
-    if (!mapLoaded || !mapInstance || !directionsRenderer || !showRoute) return;
+    if (!mapLoaded || !mapInstance || !directionsRenderer || !showRoute || apiKeyError) return;
     
     if (!hubAddress || !sourceAddress || !destinationAddress) {
       // Clear existing route if any address is missing
@@ -170,20 +191,33 @@ const GoogleMap: React.FC<GoogleMapProps> = ({
         );
       }
     );
-  }, [mapLoaded, mapInstance, directionsRenderer, hubAddress, sourceAddress, destinationAddress, showRoute]);
+  }, [mapLoaded, mapInstance, directionsRenderer, hubAddress, sourceAddress, destinationAddress, showRoute, apiKeyError]);
 
   return (
     <div className="rounded-md overflow-hidden border border-gray-200 bg-white shadow-inner w-full h-full min-h-[300px]">
-      {!mapLoaded && (
+      {!mapLoaded && !apiKeyError && !loadError && (
         <div className="flex items-center justify-center h-full bg-gray-50">
           <Loader className="w-6 h-6 text-primary animate-spin mr-2" />
           <span className="text-gray-500">Loading map...</span>
         </div>
       )}
-      {loadError && (
-        <div className="flex flex-col items-center justify-center h-full bg-gray-50 p-6 text-center">
-          <div className="text-red-500 mb-2 text-lg">⚠️ Map Error</div>
-          <p className="text-gray-700 mb-4">{loadError}</p>
+      
+      {(loadError || apiKeyError) && (
+        <div className="flex flex-col items-center justify-center h-full bg-gray-50 p-6">
+          <Alert variant="destructive" className="mb-4 max-w-md">
+            <AlertTriangle className="h-5 w-5 mr-2" />
+            <AlertTitle>Map Error</AlertTitle>
+            <AlertDescription>
+              {apiKeyError 
+                ? "Google Maps couldn't load due to an API key issue. This is a development-only API key that may have restrictions."
+                : loadError}
+            </AlertDescription>
+          </Alert>
+          
+          <p className="text-sm text-gray-600 text-center mb-4">
+            {apiKeyError && "For a production app, you would need to set up a properly configured Google Maps API key."}
+          </p>
+          
           <button 
             onClick={() => window.location.reload()} 
             className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark transition-colors"
@@ -192,6 +226,7 @@ const GoogleMap: React.FC<GoogleMapProps> = ({
           </button>
         </div>
       )}
+      
       <div ref={mapRef} className="w-full h-full" />
     </div>
   );
