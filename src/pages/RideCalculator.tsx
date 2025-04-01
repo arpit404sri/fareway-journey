@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Separator } from "@/components/ui/separator";
 import Navbar from "@/components/Navbar";
 import { toast } from "sonner";
-import { MapPin, Clock, DollarSign, Route, Users, ArrowRight, Loader2 } from "lucide-react";
+import { MapPin, Clock, DollarSign, Route, Users, ArrowRight, Loader2, MapIcon } from "lucide-react";
 import { 
   calculateCompleteRide, 
   HUB_LOCATION, 
@@ -20,6 +20,7 @@ import {
 } from "@/utils/rideCalculator";
 import { useNavigate } from "react-router-dom";
 import { Switch } from "@/components/ui/switch";
+import GoogleMap from "@/components/GoogleMap";
 
 const RideCalculator = () => {
   const { user } = useAuth();
@@ -32,6 +33,7 @@ const RideCalculator = () => {
   
   const [calculating, setCalculating] = useState(false);
   const [bookingRide, setBookingRide] = useState(false);
+  const [showMap, setShowMap] = useState(false);
   
   const [rideDetails, setRideDetails] = useState<{
     hubToSourceDistance: number;
@@ -43,6 +45,11 @@ const RideCalculator = () => {
   
   // Check if user already has a ride today
   const userHasRideToday = user ? hasRideToday(user.id) : false;
+  
+  // Reset map visibility when addresses change
+  useEffect(() => {
+    setShowMap(false);
+  }, [sourceAddress, destinationAddress]);
   
   const handleCalculate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,6 +63,7 @@ const RideCalculator = () => {
       setCalculating(true);
       const results = await calculateCompleteRide(sourceAddress, destinationAddress);
       setRideDetails(results);
+      setShowMap(true);
       toast.success("Fare calculated successfully!");
     } catch (error) {
       console.error("Calculation error:", error);
@@ -124,9 +132,9 @@ const RideCalculator = () => {
           Calculate the exact fare for your journey from our hub to your destination.
         </p>
         
-        <div className="grid md:grid-cols-2 gap-8">
+        <div className="grid lg:grid-cols-5 gap-8">
           {/* Left column - Calculation Form */}
-          <div>
+          <div className="lg:col-span-2">
             <Card>
               <CardHeader>
                 <CardTitle>Enter Ride Details</CardTitle>
@@ -244,31 +252,113 @@ const RideCalculator = () => {
             </Card>
           </div>
           
-          {/* Right column - Fare Details */}
-          <div>
+          {/* Middle column - Map display */}
+          <div className="lg:col-span-3">
+            <Card className="h-full flex flex-col">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2">
+                  <MapIcon className="h-5 w-5" />
+                  Route Map
+                </CardTitle>
+                <CardDescription>
+                  {showMap && rideDetails 
+                    ? `Total trip: ${rideDetails.totalDistance.toFixed(1)} miles (${rideDetails.totalTime} mins)`
+                    : 'Enter your addresses and calculate to see the route'
+                  }
+                </CardDescription>
+              </CardHeader>
+              
+              <CardContent className="flex-grow">
+                <div className="h-[400px] w-full">
+                  <GoogleMap 
+                    sourceAddress={sourceAddress}
+                    destinationAddress={destinationAddress}
+                    hubAddress={HUB_LOCATION.address}
+                    showRoute={showMap}
+                  />
+                </div>
+              </CardContent>
+              
+              {rideDetails && (
+                <>
+                  <Separator />
+                  <CardFooter className="flex-col gap-4 pt-6">
+                    <div className="grid grid-cols-2 gap-4 w-full">
+                      <div className="flex items-center justify-between border-r pr-4">
+                        <div className="flex items-center text-sm font-medium">
+                          <Route className="mr-2 h-4 w-4 text-primary" />
+                          Hub to Source
+                        </div>
+                        <span className="font-semibold">{rideDetails.hubToSourceDistance.toFixed(1)} mi</span>
+                      </div>
+                      
+                      <div className="flex items-center justify-between pl-2">
+                        <div className="flex items-center text-sm font-medium">
+                          <Route className="mr-2 h-4 w-4 text-primary" />
+                          Source to Destination
+                        </div>
+                        <span className="font-semibold">{rideDetails.sourceToDestDistance.toFixed(1)} mi</span>
+                      </div>
+                    </div>
+                    
+                    <div className="w-full flex items-center justify-between bg-primary-light/10 px-4 py-2 rounded-md">
+                      <div className="flex items-center font-bold text-primary-dark">
+                        <DollarSign className="mr-1 h-5 w-5" />
+                        Total Fare
+                      </div>
+                      <span className="font-bold text-lg">${calculateFinalFare().toFixed(2)}</span>
+                    </div>
+                    
+                    <Button 
+                      className="w-full"
+                      onClick={handleBookRide}
+                      disabled={bookingRide || userHasRideToday}
+                    >
+                      {bookingRide ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Booking Ride...
+                        </>
+                      ) : userHasRideToday ? (
+                        "You've already booked a ride today"
+                      ) : (
+                        "Book This Ride"
+                      )}
+                    </Button>
+                  </CardFooter>
+                </>
+              )}
+            </Card>
+          </div>
+        </div>
+        
+        {/* Bottom section - Fare Details */}
+        {rideDetails && (
+          <div className="mt-8">
             <Card>
               <CardHeader>
-                <CardTitle>Fare Details</CardTitle>
+                <CardTitle>Detailed Fare Breakdown</CardTitle>
                 <CardDescription>
-                  Breakdown of your ride cost
+                  See how your fare is calculated
                 </CardDescription>
               </CardHeader>
               
               <CardContent>
-                {rideDetails ? (
-                  <div className="space-y-6">
-                    <div className="space-y-4">
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <h3 className="font-medium text-gray-700">Distance & Time</h3>
+                    <div className="space-y-3">
                       <div className="flex justify-between items-center">
-                        <div className="flex items-center">
-                          <Route className="mr-2 h-5 w-5 text-gray-500" />
+                        <div className="flex items-center text-sm">
+                          <Route className="mr-2 h-4 w-4 text-gray-500" />
                           <span>Hub to Source Distance</span>
                         </div>
                         <span className="font-medium">{rideDetails.hubToSourceDistance.toFixed(1)} miles</span>
                       </div>
                       
                       <div className="flex justify-between items-center">
-                        <div className="flex items-center">
-                          <Route className="mr-2 h-5 w-5 text-gray-500" />
+                        <div className="flex items-center text-sm">
+                          <Route className="mr-2 h-4 w-4 text-gray-500" />
                           <span>Source to Destination</span>
                         </div>
                         <span className="font-medium">{rideDetails.sourceToDestDistance.toFixed(1)} miles</span>
@@ -276,7 +366,7 @@ const RideCalculator = () => {
                       
                       <div className="flex justify-between items-center">
                         <div className="flex items-center font-medium">
-                          <MapPin className="mr-2 h-5 w-5 text-gray-700" />
+                          <MapPin className="mr-2 h-4 w-4 text-gray-700" />
                           <span>Total Distance</span>
                         </div>
                         <span className="font-bold">{rideDetails.totalDistance.toFixed(1)} miles</span>
@@ -284,18 +374,19 @@ const RideCalculator = () => {
                       
                       <div className="flex justify-between items-center">
                         <div className="flex items-center font-medium">
-                          <Clock className="mr-2 h-5 w-5 text-gray-700" />
+                          <Clock className="mr-2 h-4 w-4 text-gray-700" />
                           <span>Estimated Time</span>
                         </div>
                         <span className="font-bold">{rideDetails.totalTime} minutes</span>
                       </div>
                     </div>
-                    
-                    <Separator />
-                    
-                    <div className="space-y-4">
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <h3 className="font-medium text-gray-700">Cost Breakdown</h3>
+                    <div className="space-y-3">
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-500">Distance Cost ({COST_PER_MILE.toFixed(2)}/mile)</span>
+                        <span className="text-sm text-gray-500">Distance Cost (${COST_PER_MILE.toFixed(2)}/mile)</span>
                         <span>${(rideDetails.totalDistance * COST_PER_MILE).toFixed(2)}</span>
                       </div>
                       
@@ -315,64 +406,35 @@ const RideCalculator = () => {
                           <span>-${(rideDetails.fare - calculateFinalFare()).toFixed(2)}</span>
                         </div>
                       )}
-                    </div>
-                    
-                    <Separator />
-                    
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center font-bold text-lg">
-                        <DollarSign className="mr-1 h-5 w-5" />
-                        <span>Total Fare</span>
-                      </div>
-                      <span className="font-bold text-lg">${calculateFinalFare().toFixed(2)}</span>
-                    </div>
-                    
-                    {isCarpool && (
-                      <div className="bg-green-50 p-3 rounded-lg border border-green-100">
-                        <div className="flex items-center text-green-800 font-medium mb-1">
-                          <Users className="mr-2 h-5 w-5" />
-                          <span>Carpool Savings</span>
+                      
+                      <Separator />
+                      
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center font-bold text-lg">
+                          <DollarSign className="mr-1 h-5 w-5" />
+                          <span>Total Fare</span>
                         </div>
-                        <p className="text-sm text-green-700">
-                          Sharing with {carpoolCount - 1} other {carpoolCount - 1 === 1 ? 'person' : 'people'} saves you ${(rideDetails.fare - calculateFinalFare()).toFixed(2)}!
-                        </p>
+                        <span className="font-bold text-lg">${calculateFinalFare().toFixed(2)}</span>
                       </div>
-                    )}
-                    
-                    <Button 
-                      className="w-full"
-                      onClick={handleBookRide}
-                      disabled={bookingRide || userHasRideToday}
-                    >
-                      {bookingRide ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Booking Ride...
-                        </>
-                      ) : userHasRideToday ? (
-                        "You've already booked a ride today"
-                      ) : (
-                        "Book This Ride"
+                      
+                      {isCarpool && (
+                        <div className="bg-green-50 p-3 rounded-lg border border-green-100">
+                          <div className="flex items-center text-green-800 font-medium mb-1">
+                            <Users className="mr-2 h-5 w-5" />
+                            <span>Carpool Savings</span>
+                          </div>
+                          <p className="text-sm text-green-700">
+                            Sharing with {carpoolCount - 1} other {carpoolCount - 1 === 1 ? 'person' : 'people'} saves you ${(rideDetails.fare - calculateFinalFare()).toFixed(2)}!
+                          </p>
+                        </div>
                       )}
-                    </Button>
-                    
-                    {userHasRideToday && (
-                      <p className="text-center text-sm text-amber-600">
-                        Note: You're limited to one ride booking per day.
-                      </p>
-                    )}
+                    </div>
                   </div>
-                ) : (
-                  <div className="text-center py-16 text-gray-500">
-                    <MapPin className="mx-auto h-12 w-12 text-gray-300 mb-4" />
-                    <p className="mb-2">Enter your source and destination addresses</p>
-                    <p>Then click "Calculate Fare" to see the breakdown</p>
-                  </div>
-                )}
+                </div>
               </CardContent>
             </Card>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
