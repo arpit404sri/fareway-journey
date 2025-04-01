@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import Navbar from "@/components/Navbar";
-import { MapPin, Clock, DollarSign, Users, ArrowRight } from "lucide-react";
+import { MapPin, Clock, DollarSign, Users, ArrowRight, Gift, Calendar } from "lucide-react";
 
 const Index = () => {
   const { user } = useAuth();
@@ -21,9 +21,19 @@ const Index = () => {
                 <h1 className="text-4xl md:text-5xl font-bold mb-4">
                   Simplify Your Journey with FareWay
                 </h1>
-                <p className="text-xl mb-8 text-gray-100">
+                <p className="text-xl mb-4 text-gray-100">
                   Calculate exact fares, book rides, and save money with our student carpooling service.
                 </p>
+                
+                {/* First Month Free Banner */}
+                <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 mb-6 border border-white/20 flex items-center">
+                  <Gift className="h-8 w-8 text-accent mr-3 flex-shrink-0" />
+                  <div>
+                    <p className="font-bold text-lg text-white">First Month Completely FREE!</p>
+                    <p className="text-gray-100">No credit card required. Then just $1/month.</p>
+                  </div>
+                </div>
+                
                 {user ? (
                   <Link to="/calculator">
                     <Button size="lg" className="bg-accent hover:bg-accent-dark text-white">
@@ -39,7 +49,7 @@ const Index = () => {
                     </Link>
                     <Link to="/register">
                       <Button size="lg" className="bg-accent hover:bg-accent-dark text-white">
-                        Sign Up Free
+                        Start Free Trial
                       </Button>
                     </Link>
                   </div>
@@ -68,6 +78,28 @@ const Index = () => {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Free Trial Highlight Section - New */}
+        <section className="py-8 bg-accent text-white">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col md:flex-row items-center justify-between">
+              <div className="flex items-center mb-4 md:mb-0">
+                <Calendar className="h-10 w-10 mr-4 text-white" />
+                <div>
+                  <h2 className="text-2xl font-bold">30 Days Free Trial</h2>
+                  <p>Try all premium features with no commitment</p>
+                </div>
+              </div>
+              {!user && (
+                <Link to="/register">
+                  <Button size="lg" className="bg-white text-accent hover:bg-gray-100">
+                    Start Free Trial Now
+                  </Button>
+                </Link>
+              )}
             </div>
           </div>
         </section>

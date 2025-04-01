@@ -4,6 +4,7 @@
 // Google Maps API type declarations
 interface Window {
   google: typeof google;
+  initMap: () => void;
 }
 
 declare namespace google {
